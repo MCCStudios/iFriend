@@ -32,12 +32,6 @@ class Main extends PluginBase  implements Listener {
         @mkdir($this->getDataFolder());
         @mkdir($this->getDataFolder() . "Players/");
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
-        new Config($this->getDataFolder() . "config.yml", CONFIG::YAML, array(
-            "players-in-same-group-are-friendly" => true,
-            "friends-are-friendly" => true,
-            "max-friends" => 8,
-            "provider" => "SQL"
-        ));
         if(!$this->getServer()->getPluginManager()->getPlugin("PurePerms")) {
             $this->getLogger()->info( TextFormat::RED . "PurePerms Not Loaded With iFriend!" );
             $this->verify = false;
@@ -46,15 +40,10 @@ class Main extends PluginBase  implements Listener {
             $this->getLogger()->info( TextFormat::GREEN . "PurePerms Loaded With iFriend!" );
             $this->verify = true;
         }
-        if($this->getConfig()->get("provider") == "SQL") {
             $this->provider = "SQL";
             $this->db = new \SQLite3($this->getDataFolder() . "iFriend.db");
             $this->db->exec("CREATE TABLE IF NOT EXISTS friends(p1 VARCHAR, p2 VARCHAR);");
             $this->getLogger()->info(TextFormat::GREEN . "Using SQL provider.");
-        } elseif($this->getConfig()->get("provider") == "YML") {
-            $this->provider = "YML";
-            $this->getLogger()->info(TextFormat::GREEN . "Using YML provider.");
-        }
     }
 	public function onCommand(CommandSender $sender, Command $command, string $label, array $args): bool {
             if($sender instanceof Player) {
@@ -68,11 +57,6 @@ class Main extends PluginBase  implements Listener {
                     if(strtolower($args[0]) !== "accept" && strtolower($args[0]) !== "decline" && strtolower($args[0]) !== "tp" && strtolower($args[0]) !== "list") {
                         if(!isset($args[0])) {
                             $sender->sendMessage(TextFormat::RED . "[iFriend] Usage:/friend <player-name> OR [accept/decline]");
-                            return true;
-                        }
-                        $max = $this->getConfig()->get("max-friends");
-                        if(count($this->getAllFriends($player)) == $max) {
-                            $sender->sendMessage(TextFormat::RED . "[iFriend] You have the max amount of friends!");
                             return true;
                         }
                         $friendexact =  $this->getServer()->getPlayer($args[0]);
@@ -209,25 +193,11 @@ class Main extends PluginBase  implements Listener {
                 $b = $a->fetchArray(SQLITE3_ASSOC);
                 return $b;
             }
-            if($this->provider == "YML") {
-                $a = new Config($this->getDataFolder() . "Players/" . $p1 . ".yml", CONFIG::YAML);
-                $b = $a->getAll();
-                return $b;
-            }
         }
 	public function removeUser($p1, $p2) {
             if($this->provider == "SQL") {
                 $this->db->query("DELETE FROM friends WHERE p1='$p1' AND p2='$p2';");
                 $this->db->query("DELETE FROM friends WHERE p1='$p2' AND p2='$p1';");
-                return;
-            }
-            if($this->provider == "YML") {
-                $a = new Config($this->getDataFolder() . "Players/" . $p1 . ".yml", CONFIG::YAML);
-                $a->remove($p2);
-                $a->save();
-                $a = new Config($this->getDataFolder() . "Players/" . $p2 . ".yml", CONFIG::YAML);
-                $a->remove($p1);
-                $a->save();
                 return;
             }
         }
@@ -241,15 +211,6 @@ class Main extends PluginBase  implements Listener {
                 $a->bindValue(":p1", $p2);
                 $a->bindValue(":p2", $p1);
                 $result = $a->execute();
-                return;
-            }
-            if($this->provider == "YML") {
-                $a = new Config($this->getDataFolder() . "Players/" . $p1 . ".yml", CONFIG::YAML);
-                $a->set("$p2", "TRUE");
-                $a->save();
-                $a = new Config($this->getDataFolder() . "Players/" . $p2 . ".yml", CONFIG::YAML);
-                $a->set("$p1", "TRUE");
-                $a->save();
                 return;
             }
         }
@@ -281,48 +242,12 @@ class Main extends PluginBase  implements Listener {
                 $b = $a->fetchArray(SQLITE3_ASSOC);
                 return !empty($b);
             }
-            if($this->provider == "YML") {
-                $a = new Config($this->getDataFolder() . "Players/" . $p1 . ".yml", CONFIG::YAML);
-                if($a->get("$p2")) {
-                    return;
-                } else {
-                    return false;
-                }
-            }
 	}
 	public function hasFriends($p1) {
             if($this->provider == "SQL") {
                 $a = $this->db->query("SELECT * FROM friends WHERE p1='$p1';");
                 $b = $a->fetchArray(SQLITE3_ASSOC);
                 return !empty($b);
-            }
-            if($this->getDataFolder() . "Players/" . $player . ".yml") {
-                    return true;
-            }else{
-                    return false;
-            }
-	}
-	public function onHurt(EntityDamageEvent $pf){
-            if($pf instanceof EntityDamageByEntityEvent) {
-                if($pf->getDamager() instanceof Player && $pf->getEntity() instanceof Player) {
-                    $sender = $pf->getDamager();
-                    $reciever = $pf->getEntity();
-                    if($this->verify) {
-                        $levelName = null;
-                        $groupName = $this->pure->getUser($reciever)->getGroup($levelName)->getName();
-                        $groupName2 = $this->pure->getUser($sender)->getGroup($levelName)->getName();
-                        if($groupName == $groupName2 && $this->getConfig()->get("players-in-same-group-are-friendly")) {
-                            $pf->setCancelled();
-                        }
-                    }
-                    $friend1 = strtolower($pf->getEntity()->getName());
-                    $friend2 = strtolower($pf->getDamager()->getName());
-                    if($this->areFriends($friend1, $friend2) && $this->getConfig()->get("friends-are-friendly")) {
-                        $pf->setCancelled(true);
-                    }else{
-                        return true;
-                    }
-                }
             }
 	}
 	public function onPlayerQuitEvent(PlayerQuitEvent $pf){
